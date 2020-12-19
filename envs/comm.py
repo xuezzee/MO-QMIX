@@ -46,10 +46,13 @@ class CommEnv():
         self.task_remain = np.zeros(self.num_user)
         self.UE_Channel_matrix = self.init_channel_matrix()
         self.create_new_task(DELTA_T)
-        self.He = abs(1 / np.sqrt(2) * (np.random.randn(NUM_Channel, self.num_user) + 1j * np.random.randn(NUM_Channel, self.num_user)))  # 边缘
-        self.Hc = 0.1 * abs(1 / np.sqrt(2) * (np.random.randn(NUM_Channel, self.num_user) + 1j * np.random.randn(NUM_Channel, self.num_user)))  # 云
-        obs = torch.Tensor(list(self.task_remain[0].reshape(-1)) + list(self.He.T[0].reshape(-1)) + list(self.Hc.T[0].reshape(-1)))
-        # obs = [np.concatenate([self.task_remain[i].reshape(-1), self.He.T[i].reshape(-1), self.Hc.T[i].reshape(-1)]) for i in range(self.num_user)]
+        self.He = abs(1 / np.sqrt(2) * (np.random.randn(NUM_Channel, self.num_user)
+                                        + 1j * np.random.randn(NUM_Channel, self.num_user)))  # 边缘
+        self.Hc = 0.1 * abs(1 / np.sqrt(2) * (np.random.randn(NUM_Channel, self.num_user)
+                                              + 1j * np.random.randn(NUM_Channel, self.num_user)))  # 云
+        obs = np.array([list(self.task_remain[i].reshape(-1)) + list(self.He.T[i].reshape(-1))
+               + list(self.Hc.T[i].reshape(-1)) for i in range(self.num_user)])
+
         return obs
 
     def sum_rate(self, UE_Channel_matrix, He, Hc, pe, pc, B, var_noise):
@@ -142,7 +145,6 @@ class CommEnv():
             else:
                 reward[j] = 1/E[j]
 
-        print("T:", T)
         return reward, E, T
 
     def create_new_task(self, delta_t):
@@ -173,34 +175,38 @@ class CommEnv():
                 self.task_remain[i] = 0
 
         obj_e, _, _ = self.compute_reward(self.UE_Channel_matrix, x, Pe, Pc, offloaded_data)
-        reward = np.array([offloaded_data[0], obj_e[0]])
-        print("reward:", reward)
-        print("task remain before new:", self.task_remain)
+        reward = np.array([offloaded_data.sum(axis=-1), obj_e.sum(axis=-1)])
+        # print("reward:", reward)
+        # print("task remain before new:", self.task_remain)
         self.ep_r = self.ep_r + reward
         self.create_new_task(delta_t)
-        print("task remain after new:", self.task_remain)
-        print("----------------------------------------------------------------------------------------")
+        # print("task remain after new:", self.task_remain)
+        # print("----------------------------------------------------------------------------------------")
         self.n_step += 1
-        self.He = abs(1 / np.sqrt(2) * (np.random.randn(NUM_Channel, self.num_user) + 1j * np.random.randn(NUM_Channel, self.num_user)))  # 边缘
-        self.Hc = 0.1 * abs(1 / np.sqrt(2) * (np.random.randn(NUM_Channel, self.num_user) + 1j * np.random.randn(NUM_Channel, self.num_user)))  # 云
-        obs = np.array(list(self.task_remain[0].reshape(-1)) + list(self.He.T[0].reshape(-1)) + list(self.Hc.T[0].reshape(-1)))
-        # obs = [np.concatenate([self.task_remain[i].reshape(-1), self.He.T[i].reshape(-1), self.Hc.T[i].reshape(-1)]) for i in range(self.num_user)]
-        return obs, reward, False, {"obj":reward, "episode":{"l":self.n_step, "r":reward}, "obj_raw":None}
+        self.He = abs(1 / np.sqrt(2) * (np.random.randn(NUM_Channel, self.num_user)
+                                        + 1j * np.random.randn(NUM_Channel, self.num_user)))  # 边缘
+        self.Hc = 0.1 * abs(1 / np.sqrt(2) * (np.random.randn(NUM_Channel, self.num_user)
+                                              + 1j * np.random.randn(NUM_Channel, self.num_user)))  # 云
+        obs = np.array([list(self.task_remain[i].reshape(-1)) + list(self.He.T[i].reshape(-1))
+               + list(self.Hc.T[i].reshape(-1)) for i in range(self.num_user)])
 
+        return obs, reward, False, {}
+
+    def get_state(self):
+        return np.array(list(self.task_remain.reshape(-1))
+                        + list(self.He.T.reshape(-1)) + list(self.Hc.T.reshape(-1)))
 
     @property
     def observation_space(self):
-        if self.num_user > 1:
-            return [Box(low=-float("inf"), high=float("inf"), shape=(51,)) for i in range(self.num_user)]
-        else:
-            return Box(low=-float("inf"), high=float("inf"), shape=(51,))
+        return Box(low=-float("inf"), high=float("inf"), shape=(2 * NUM_Channel + 1,))
 
     @property
     def action_space(self):
-        if self.num_user > 1:
-            return [Box(low=0, high=1, shape=(3,)) for i in range(self.num_user)]
-        else:
-            return Box(low=0, high=1, shape=(3,))
+        return Discrete(11)
+
+    @property
+    def state_space(self):
+        return Box(low=-float("inf"), high=float("inf"), shape=(2 * NUM_Channel * self.num_user + self.num_user,))
 
 
 
