@@ -32,7 +32,6 @@ def run():
         for step in range(1000):
             # print(step)
             acts = agents.choose_action(obs, w)
-            print("acts:", acts)
             obs_, rew, done, info = env.step(acts)
             state_ = env.get_state()
             pref = [w[0][0]]
@@ -42,8 +41,7 @@ def run():
             state = state_
             obs = obs_
             print(agents.replayBuffer.__len__())
-            if ((agents.replayBuffer.__len__() >= agent_args.batch_size)
-                    and (total_step % 15 == 0)):
+            if ((agents.replayBuffer.__len__() >= agent_args.batch_size)):
                 agents.learn()
             total_step += agent_args.n_threads
 
@@ -56,12 +54,13 @@ def get_args():
     parser.add_argument("--h_dim", default=128)
     parser.add_argument("--n_obj", default=2)
     parser.add_argument("--hyper_h1", default=64)
-    parser.add_argument("--n_threads", default=2)
+    parser.add_argument("--n_threads", default=1)
     parser.add_argument("--batch_size", default=128)
     parser.add_argument("--epoches", default=1000)
     parser.add_argument('--preference_distribution', default="uniform")
     parser.add_argument('--epsilon', default=0.9)
     parser.add_argument('--norm_rews', default=True)
+    parser.add_argument('--learning_rate', default=0.001)
 
     return parser.parse_args()
 
@@ -78,7 +77,7 @@ def get_env_args():
     parser.add_argument('--num_user', default=5)
     parser.add_argument('--processing_period', default=0.01)
     parser.add_argument('--discrete', default=True)
-    parser.add_argument("--n_threads", default=2)
+    parser.add_argument("--n_threads", default=1)
 
     return parser.parse_args()
 

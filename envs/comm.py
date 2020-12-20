@@ -50,8 +50,9 @@ class CommEnv():
                                         + 1j * np.random.randn(NUM_Channel, self.num_user)))  # 边缘
         self.Hc = 0.1 * abs(1 / np.sqrt(2) * (np.random.randn(NUM_Channel, self.num_user)
                                               + 1j * np.random.randn(NUM_Channel, self.num_user)))  # 云
-        obs = np.array([list(self.task_remain[i].reshape(-1)) + list(self.He.T[i].reshape(-1))
-               + list(self.Hc.T[i].reshape(-1)) for i in range(self.num_user)])
+        task_remain = (self.task_remain - self.args.mean_normal) / self.args.var_normal / 1000
+        obs = np.array([list(task_remain[i].reshape(-1)) + list(self.He.T[i].reshape(-1))
+                        + list(self.Hc.T[i].reshape(-1)) for i in range(self.num_user)])
 
         return obs
 
@@ -187,13 +188,15 @@ class CommEnv():
                                         + 1j * np.random.randn(NUM_Channel, self.num_user)))  # 边缘
         self.Hc = 0.1 * abs(1 / np.sqrt(2) * (np.random.randn(NUM_Channel, self.num_user)
                                               + 1j * np.random.randn(NUM_Channel, self.num_user)))  # 云
-        obs = np.array([list(self.task_remain[i].reshape(-1)) + list(self.He.T[i].reshape(-1))
-               + list(self.Hc.T[i].reshape(-1)) for i in range(self.num_user)])
+        task_remain = (self.task_remain - self.args.mean_normal) / self.args.var_normal / 1000
+        obs = np.array([list(task_remain[i].reshape(-1)) + list(self.He.T[i].reshape(-1))
+                        + list(self.Hc.T[i].reshape(-1)) for i in range(self.num_user)])
 
         return obs, reward, False, {}
 
     def get_state(self):
-        return np.array(list(self.task_remain.reshape(-1))
+        task_remain = (self.task_remain - self.args.mean_normal) / self.args.var_normal / 1000
+        return np.array(list(task_remain.reshape(-1))
                         + list(self.He.T.reshape(-1)) + list(self.Hc.T.reshape(-1)))
 
     @property

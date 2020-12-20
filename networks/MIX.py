@@ -1,6 +1,7 @@
 import torch
 from torch import nn
 import torch.nn.functional as F
+import numpy as np
 
 class HyperNet(nn.Module):
     def __init__(self, args):
@@ -9,12 +10,12 @@ class HyperNet(nn.Module):
         self.hyper_w1 = nn.Sequential(
             nn.Linear(args.s_dim + args.n_obj, 128),
             nn.ReLU(),
-            nn.Linear(128, args.n_agents * args.hyper_h1),
+            nn.Linear(128, 3 * args.n_agents * args.hyper_h1),
         )
         self.hyper_w2 = nn.Sequential(
             nn.Linear(args.s_dim + args.n_obj, 128),
             nn.ReLU(),
-            nn.Linear(128, args.hyper_h1),
+            nn.Linear(128, args.hyper_h1 * self.args.n_obj),
         )
         self.hyper_b1 = nn.Sequential(
             nn.Linear(args.s_dim + args.n_obj, 128),
@@ -24,35 +25,41 @@ class HyperNet(nn.Module):
         self.hyper_b2 = nn.Sequential(
             nn.Linear(args.s_dim + args.n_obj, 128),
             nn.ReLU(),
-            nn.Linear(64, 1)
+            nn.Linear(128, self.args.n_obj)
         )
 
     def forward(self, s, w):
         s = self.convert_type(s)
         w = self.convert_type(w)
-        x = torch.cat([s, w])
-        w1 = self.hyper_w1(x).view(-1, self.args.hyper_h1)
-        w2 = self.hyper_w2(x).view(-1, self.args.hyper_h2)
-        b1 = self.hyper_b1(x)
-        b2 = self.hyper_b2(x)
+        x = torch.cat([s, w], dim=-1)
+        w1 = self.hyper_w1(x).view(-1, 3 * self.args.n_agents, self.args.hyper_h1)
+        w2 = self.hyper_w2(x).view(-1, self.args.hyper_h1, self.args.n_obj)
+        b1 = self.hyper_b1(x).unsqueeze(1)
+        b2 = self.hyper_b2(x).unsqueeze(1)
 
         return w1, w2, b1, b2
 
-    def Q_tot(self, s, w, Q):
-        input = []
-        for q in Q:
-            input.append(torch.bmm(w, q))
-        input = torch.cat(input)
+    def get_Q_tot(self, s, w, Q):
+        # input = []
+        # for q in Q:
+        #     input.append(torch.bmm(w, q))
+        # input = torch.cat(input)
+        s = s.unsqueeze(1)
+        s = s.repeat([1, 32, 1]).view(-1, s.shape[-1])
+        # w = w.unsqueeze(1)
+        w = w.repeat([2, 1]).view(-1, self.args.n_obj)
+        Q = Q.unsqueeze(1)
         w1, w2, b1, b2 = self.forward(s, w)
-        h1 = F.relu(torch.bmm(w1, input) + b1)
-        out = F.relu(torch.bmm(w2, h1) + b2)
+        h1 = F.relu(torch.bmm(Q, w1) + b1)
+        out = F.relu(torch.bmm(h1, w2) + b2)
 
-        return torch.bmm(w, out)
+        return out.squeeze(1)
+        return torch.bmm(w.unsqueeze(1), out.permute(0, 2, 1)).squeeze(-1)
 
     def convert_type(self, input):
         if not isinstance(input, torch.Tensor):
             input = torch.Tensor(input)
-        if input.device() != torch.device(self.args.device):
+        if input.device != torch.device(self.args.device):
             input = input.to(self.device)
 
         return input

@@ -30,8 +30,6 @@ class ReplayBuffer():
         next_state = self.convert_type(next_state)
         pref = self.convert_type(pref)
 
-        print("act:",rew)
-
         nentries = obs.shape[0]
         if self.curr_i + nentries > self.args.buffer_size:
             rollover = self.args.buffer_size - self.curr_i
@@ -52,7 +50,6 @@ class ReplayBuffer():
         self.pref_buffs[self.curr_i:self.curr_i + nentries] = pref
         for a in range(self.args.n_agents):
             self.obs_buffs[a][self.curr_i:self.curr_i + nentries] = np.vstack(obs[:, a])
-            print("act[a]:", act[a])
             self.act_buffs[a][self.curr_i:self.curr_i + nentries] = act[a]
             self.next_obs_buffs[a][self.curr_i:self.curr_i + nentries] = np.vstack(next_obs[:, a])
 
