@@ -177,8 +177,6 @@ class CommEnv():
 
         obj_e, _, _ = self.compute_reward(self.UE_Channel_matrix, x, Pe, Pc, offloaded_data)
         reward = np.array([offloaded_data.sum(axis=-1), obj_e.sum(axis=-1)])
-        # print("reward:", reward)
-        # print("task remain before new:", self.task_remain)
         self.ep_r = self.ep_r + reward
         self.create_new_task(delta_t)
         # print("task remain after new:", self.task_remain)
@@ -223,7 +221,7 @@ def get_args():
     parser.add_argument('--lam', default=100)
     parser.add_argument('--mean_normal', default=100000)
     parser.add_argument('--var_normal', default=10000)
-    parser.add_argument('--num_user', default=10)
+    parser.add_argument('--num_user', default=3)
     parser.add_argument('--processing_period', default=0.01)
     parser.add_argument('--discrete', default=True)
 
@@ -234,9 +232,19 @@ if __name__ == '__main__':
     args = get_args()
     env = CommEnv(args)
     env.reset()
-    for i in range(1000):
-        action = [[np.random.randint(0, 10) for _ in range(3)] for _ in range(args.num_user)]
-        # print("action:", action)
-        # state, reward, done, info = env.step(action, 0.001)
-        # print(info)
-        print(env.step(action, 0.001))
+    for ep in range(10):
+        tot_rew1 = 0
+        tot_rew2 = 0
+        for i in range(200):
+            action = [[np.random.randint(0, 10) for _ in range(3)] for _ in range(args.num_user)]
+            # print(action)
+            action = [[0, 10, 10] for _ in range(args.num_user)]
+            # print(action)
+            # print("action:", action)
+            # state, reward, done, info = env.step(action, 0.001)
+            # print(info)
+            _, r, _, _ = env.step(action)
+            # print(r)
+            tot_rew1 += r[0]
+            tot_rew2 += r[1]
+        print("total reward:", tot_rew1, tot_rew2)

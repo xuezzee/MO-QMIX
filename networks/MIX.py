@@ -7,6 +7,7 @@ class HyperNet(nn.Module):
     def __init__(self, args):
         super(HyperNet, self).__init__()
         self.args = args
+        self.device = args.device
         self.hyper_w1 = nn.Sequential(
             nn.Linear(args.s_dim + args.n_obj, 128),
             nn.ReLU(),
@@ -27,6 +28,7 @@ class HyperNet(nn.Module):
             nn.ReLU(),
             nn.Linear(128, self.args.n_obj)
         )
+        self.to(self.device)
 
     def forward(self, s, w):
         s = self.convert_type(s)
@@ -40,16 +42,16 @@ class HyperNet(nn.Module):
         return w1, w2, b1, b2
 
     def get_Q_tot(self, s, w, Q):
-        # input = []
-        # for q in Q:
-        #     input.append(torch.bmm(w, q))
-        # input = torch.cat(input)
         s = s.unsqueeze(1)
-        s = s.repeat([1, 32, 1]).view(-1, s.shape[-1])
+        s = s.repeat([1, self.args.batch_size_p, 1]).view(-1, s.shape[-1])
         # w = w.unsqueeze(1)
-        w = w.repeat([2, 1]).view(-1, self.args.n_obj)
+        w = w.repeat([self.args.batch_size, 1]).view(-1, self.args.n_obj)
         Q = Q.unsqueeze(1)
         w1, w2, b1, b2 = self.forward(s, w)
+        w1 = torch.abs(w1)
+        w2 = torch.abs(w2)
+        # b1 = torch.abs(b1)
+        # b2 = torch.abs(b2)
         h1 = F.relu(torch.bmm(Q, w1) + b1)
         out = F.relu(torch.bmm(h1, w2) + b2)
 

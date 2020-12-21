@@ -41,13 +41,15 @@ class ReplayBuffer():
                 self.state_buffs[a] = np.roll(self.state_buffs[a], rollover, axis=0)
                 self.next_obs_buffs[a] = np.roll(self.next_obs_buffs[a], rollover, axis=0)
                 self.next_state_buffs[a] = np.roll(self.next_state_buffs[a], rollover, axis=0)
-                self.pref_buffs[a] = np.roll(self.next_obs_buffs[a], rollover, axis=0)
+                # self.pref_buffs[a] = np.roll(self.next_obs_buffs[a], rollover, axis=0)
+            self.curr_i = 0
+            self.filled_i = self.args.buffer_size
 
         self.done_buffs[0][self.curr_i:self.curr_i + nentries] = dones[0]
         self.state_buffs[self.curr_i:self.curr_i + nentries] = state
         self.next_state_buffs[self.curr_i:self.curr_i + nentries] = next_state
         self.rew_buffs[self.curr_i:self.curr_i + nentries] = rew
-        self.pref_buffs[self.curr_i:self.curr_i + nentries] = pref
+        # self.pref_buffs[self.curr_i:self.curr_i + nentries] = pref
         for a in range(self.args.n_agents):
             self.obs_buffs[a][self.curr_i:self.curr_i + nentries] = np.vstack(obs[:, a])
             self.act_buffs[a][self.curr_i:self.curr_i + nentries] = act[a]
@@ -85,5 +87,5 @@ class ReplayBuffer():
                 "next_obs":[cast(self.next_obs_buffs)[i][inds] for i in range(self.args.n_agents)],
                 "state":cast(self.state_buffs)[inds],
                 "next_state":cast(self.next_state_buffs)[inds],
-                "pref":cast(self.pref_buffs)[inds],
+                # "pref":cast(self.pref_buffs)[inds],
                 "rew":ret_rews,}

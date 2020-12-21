@@ -8,6 +8,7 @@ class Q_net(nn.Module):
     def __init__(self, args):
         super(Q_net, self).__init__()
         self.args = args
+        self.device = args.device
         self.Linear = nn.Linear(args.o_dim+args.n_obj, args.h_dim)
         self.GRU1 = nn.Linear(args.h_dim, args.h_dim)
         self.GRU2 = nn.GRUCell(args.h_dim, args.h_dim, bias=True)
@@ -15,6 +16,7 @@ class Q_net(nn.Module):
         self.out1 = nn.Linear(args.h_dim, args.a_dim * args.n_obj)
         self.out2 = nn.Linear(args.h_dim, args.a_dim * args.n_obj)
         self.out3 = nn.Linear(args.h_dim, args.a_dim * args.n_obj)
+        self.to(self.device)
 
     def forward(self, input):
         input = self.convert_type(input)
@@ -35,51 +37,49 @@ class Q_net(nn.Module):
             x = x.to(self.args.device)
         return x
 
-    def choose_action(self, o, w):
+    def choose_action(self, o, w, epsilon):
         o = self.convert_type(o)
         w = self.convert_type(w)
-        input = torch.cat([o, w], dim=-1)
+        input = torch.cat([o, w], dim=-1).to(self.device)
         q = self.forward(input)
         for i in range(len(q)):
             q[i] = torch.cat([torch.matmul(w[t].view(-1, self.args.n_obj), q[i][t].view(-1, self.args.n_obj).T)
                               for t in range(self.args.n_threads)])
         actions = []
         for i in range(3):
-            if random.random() > self.args.epsilon:
-                actions.append(np.array([random.randint(0, self.args.a_dim - 1) for _ in range(self.args.n_threads)]))
+            if random.random() < epsilon:
+                actions.append(np.array([random.randint(0, self.args.a_dim - 1)
+                                         for _ in range(self.args.n_threads)]))
             else:
                 actions.append(torch.argmax(q[i], dim=-1).data.cpu().numpy())
 
         return actions
 
     def get_target_q(self, x, w):
+        x = self.convert_type(x)
+        w = self.convert_type(w)
+        x = x.reshape((-1, self.args.a_dim + self.args.n_obj))
         q = self.forward(x)
         for i in range(len(q)):
-            q[i] = q[i].view(-1, self.args.n_obj)
+            q[i] = q[i].reshape((-1, self.args.batch_size_p*self.args.a_dim, self.args.n_obj))
         q = [torch.matmul(q[i], w.unsqueeze(-1)) for i in range(len(q))]
-        return torch.cat([torch.max(q[i]).unsqueeze(0) for i in range(len(q))])
+
+        return torch.cat([torch.max(q[i], dim=-2).values.unsqueeze(0) for i in range(len(q))])
 
     def get_q(self, x, w, a):
         x = self.convert_type(x)
         w = self.convert_type(w)
         a = self.convert_type(a)
-        a = a.expand(32, a.shape[0], a.shape[1]).permute(2, 1, 0).unsqueeze(-1)
-        shape = [*a.shape, 1, self.args.n_obj]
+        a = a.expand(self.args.batch_size_p, a.shape[0], a.shape[1]).permute(2, 1, 0).unsqueeze(-1)
         a = a.type(torch.int64).repeat([1, 1, 1, self.args.n_obj]).unsqueeze(-2)
         input = torch.cat([x, w], dim=-1)
         q = self.forward(input)
-        q = [q[i].reshape(32, self.args.batch_size, self.args.a_dim, self.args.n_obj).\
+        q = [q[i].reshape(self.args.batch_size_p, self.args.batch_size, self.args.a_dim, self.args.n_obj).\
                                                 permute(1, 0, 2, 3) for i in range(3)]
         q = [torch.gather(q[i], -2, a[i]) for i in range(3)]
         wq = [torch.bmm(w.view(-1, 1, self.args.n_obj), q[i].view(-1, self.args.n_obj, 1)).squeeze(-1) for i in range(3)]
         wq = torch.cat(wq, dim=-1)
         return wq
-
-
-    def learn(self, sample):
-        raise NotImplemented
-
-
 
 
 def get_args():
