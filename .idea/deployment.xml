@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <project version="4">
-  <component name="PublishConfigData" autoUpload="Always" serverName="MOQMIX" remoteFilesAllowedToDisappearOnAutoupload="false">
+  <component name="PublishConfigData" autoUpload="Always" serverName="xze@192.168.2.131:22" remoteFilesAllowedToDisappearOnAutoupload="false">
     <serverData>
       <paths name="MOQMIX">
         <serverdata>
@@ -13,6 +13,13 @@
         <serverdata>
           <mappings>
             <mapping deploy="/home/officer/xze/MOQMIX" local="$PROJECT_DIR$" />
+          </mappings>
+        </serverdata>
+      </paths>
+      <paths name="xze@192.168.2.131:22">
+        <serverdata>
+          <mappings>
+            <mapping deploy="/home/xze/MO" local="$PROJECT_DIR$" />
           </mappings>
         </serverdata>
       </paths>

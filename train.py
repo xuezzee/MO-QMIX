@@ -84,11 +84,15 @@ def run():
             # print("update_step:", update_step)
             # print("agent_args.update_step:", agent_args.update_step)
             if ((agents.replayBuffer.__len__() >= agent_args.batch_size) and update_step == agent_args.update_step):
-                print('updating... step:{0}'.format(step))
-                agents.learn()
+                for t in range(agent_args.update_times):
+                    print('updating... step:{0}'.format(t))
+                    agents.learn()
                 print("update finish")
             if update_step == agent_args.update_step:
                 update_step = 0
+            if total_step % 1000 == 0:
+                agents.save_model(total_step)
+            agents.update_target()
             # total_step += agent_args.n_threads
             total_step += 1
             update_step += 1
@@ -101,19 +105,20 @@ def get_args():
     parser = argparse.ArgumentParser()
     parser.add_argument("--n_agents", default=3)
     parser.add_argument("--gpu", default=False)
-    parser.add_argument("--buffer_size", default=20000)
+    parser.add_argument("--buffer_size", default=30000)
     parser.add_argument("--h_dim", default=128)
     parser.add_argument("--n_obj", default=2)
     parser.add_argument("--hyper_h1", default=128)
-    parser.add_argument("--n_threads", default=2)
+    parser.add_argument("--n_threads", default=5)
     parser.add_argument("--batch_size", default=4096)
     parser.add_argument("--epoches", default=1000)
     parser.add_argument('--preference_distribution', default="uniform")
     parser.add_argument('--epsilon', default=0.6)
     parser.add_argument('--norm_rews', default=True)
     parser.add_argument('--learning_rate', default=0.001)
-    parser.add_argument('--update_step', default=100)
+    parser.add_argument('--update_step', default=200)
     parser.add_argument('--batch_size_p', default=1)
+    parser.add_argument('--update_times', default=2)
 
     return parser.parse_args()
 
@@ -130,8 +135,8 @@ def get_env_args():
     parser.add_argument('--num_user', default=3)
     parser.add_argument('--processing_period', default=0.01)
     parser.add_argument('--discrete', default=True)
-    parser.add_argument("--n_threads", default=2)
-    parser.add_argument('--log_dir', default='./log1')
+    parser.add_argument("--n_threads", default=5)
+    parser.add_argument('--log_dir', default='./log2')
 
     return parser.parse_args()
 

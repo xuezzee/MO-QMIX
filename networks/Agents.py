@@ -19,7 +19,8 @@ class Agents():
         policy_param = [policy.parameters() for policy in self.policy]
         self.optim = torch.optim.Adam(itertools.chain(*policy_param,
                                                       self.hyperNet.parameters()), lr=self.args.learning_rate)
-        self.lr_scheduler = torch.optim.lr_scheduler.StepLR(self.optim, step_size=10, gamma=0.95, last_epoch=-1)
+        self.lr_scheduler = torch.optim.lr_scheduler.StepLR(self.optim, step_size=100, gamma=0.95, last_epoch=-1)
+        self.step = 0
 
     def choose_action(self, obs, preference, epsilon):
         obs = np.array(obs).transpose((1,0,2))
@@ -71,6 +72,7 @@ class Agents():
         loss.backward()
         self.optim.step()
         self.lr_scheduler.step()
+        # print("learning rate:", self.optim)
 
     def loss_func(self, Q, Q_target, R, w):
         R = self.convert_type(R)
@@ -89,6 +91,14 @@ class Agents():
         self.replayBuffer.push(traj["obs"], traj["acts"], traj["rew"], traj["next_obs"],
                                traj["done"], traj["state"], traj["next_state"], traj["pref"])
 
+    def update_target(self):
+        self.step += 1
+        if self.step % 1000 == 0:
+            print("updating target nets")
+            self.hyperNet_target.load_state_dict(self.hyperNet.state_dict())
+            for i in range(len(self.policy)):
+                self.policy_target[i].load_state_dict(self.policy[i].state_dict())
+
     def convert_type(self, input):
         if not isinstance(input, torch.Tensor):
             input = torch.Tensor(input)
@@ -97,8 +107,26 @@ class Agents():
 
         return input
 
-    def save_model(self):
-        raise NotImplemented
+    def save_model(self, ep, path='./model/MOQMIX/'):
+        print("saving model")
+        state = {}
+        for i in range(len(self.policy)):
+            state['policy{0}'.format(i)] = self.policy[i].state_dict()
+            state['target_policy{0}'.format(i)] = self.policy_target[i].state_dict()
+        state['hyperNet'] = self.hyperNet.state_dict()
+        state['target_hyperNet'] = self.hyperNet_target.state_dict()
+        state['optim'] = self.optim.state_dict()
+        state['lr_scheduler'] = self.lr_scheduler.state_dict()
+        state['epoch'] = ep
+        torch.save(state, path+"model.pth")
 
-    def load_model(self):
-        raise NotImplemented
+    def load_model(self, path='./model/MOQMIX', device='cpu'):
+        state = torch.load(path+"model.pth", map_location=device)
+        for i in range(len(self.policy)):
+            self.policy[i].load_state_dict(state['policy{0}'.format(i)])
+            self.policy_target[i].load_state_dict(state['target_policy{0}'.format(i)])
+        self.hyperNet = state['hyperNet']
+        self.hyperNet_target = state['target_hyperNet']
+        self.optim = state['optim']
+        self.lr_scheduler = state['lr_scheduler']
+        return state['epoch']

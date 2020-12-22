@@ -44,7 +44,6 @@ class HyperNet(nn.Module):
     def get_Q_tot(self, s, w, Q):
         s = s.unsqueeze(1)
         s = s.repeat([1, self.args.batch_size_p, 1]).view(-1, s.shape[-1])
-        # w = w.unsqueeze(1)
         w = w.repeat([self.args.batch_size, 1]).view(-1, self.args.n_obj)
         Q = Q.unsqueeze(1)
         w1, w2, b1, b2 = self.forward(s, w)
