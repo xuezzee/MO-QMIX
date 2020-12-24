@@ -19,7 +19,7 @@ class Agents():
         policy_param = [policy.parameters() for policy in self.policy]
         self.optim = torch.optim.Adam(itertools.chain(*policy_param,
                                                       self.hyperNet.parameters()), lr=self.args.learning_rate)
-        self.lr_scheduler = torch.optim.lr_scheduler.StepLR(self.optim, step_size=100, gamma=0.95, last_epoch=-1)
+        self.lr_scheduler = torch.optim.lr_scheduler.StepLR(self.optim, step_size=100, gamma=0.9, last_epoch=-1)
         self.step = 0
 
     def choose_action(self, obs, preference, epsilon):
@@ -83,8 +83,8 @@ class Agents():
         wy = torch.bmm(w.unsqueeze(1), y.unsqueeze(-1))
         wq  =torch.bmm(w.unsqueeze(1), Q.unsqueeze(-1))
         Lb = torch.abs(wy - wq).mean()
-        loss = La + Lb
-        # loss = La
+        # loss = La + Lb
+        loss = La
         return loss
 
     def push(self, traj):

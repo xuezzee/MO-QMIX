@@ -10,6 +10,7 @@ from utils.env_wrapper import EnvWrapper, EnvWrapper_sigle
 from utils.preference_pool import Preference
 import tensorboardX
 import copy
+import time
 
 def cal_average_score(window, step, writer, tag="scalarized value"):
     r = copy.deepcopy(window['r'])
@@ -48,23 +49,29 @@ def run():
     update_step = 0
     record_step = 0
     for ep in range(agent_args.epoches // agent_args.n_threads):
-        print('epoch:{0}--------------------------------------------'.format(ep))
+        print('episode:{0}--------------------------------------------'.format(ep))
         obs = env.reset()
         state = env.get_state()
         w = preferences.sample(1, require_tensor=False)[0]
         tot_rew = 0
+        print("epsilon:", agent_args.epsilon)
         for step in range(200):
-            if agent_args.epsilon > 0.05:
+            if agent_args.epsilon > 0.01:
                 if total_step % 1000 == 0:
                     agent_args.epsilon = agent_args.epsilon * 0.8
             else:
                 agent_args.epsilon = 0.05
+            print("obs:", obs)
             acts = agents.choose_action(obs, w, agent_args.epsilon)
+            print("acts:", acts)
             obs_, rew, done, info = env.step(acts)
+            print("obs_next:", obs_)
+            print("rew:", rew)
+            print("--------------------------------------------------")
             for i in range(len(rew)):
                 window['r'].append(rew[i])
                 window['w'].append(np.array(w[i][0]))
-                if len(window) > agent_args.n_threads:
+                if len(window['r']) > agent_args.n_threads:
                     window['r'].pop(0)
                     window['w'].pop(0)
             # if record_step % 1 == 0:
@@ -97,26 +104,27 @@ def run():
             total_step += 1
             update_step += 1
             record_step += 1
+            time_end = time.time()
         print("ep reward:", tot_rew)
         writer.add_scalar("total reward:", tot_rew, ep)
 
 
 def get_args():
     parser = argparse.ArgumentParser()
-    parser.add_argument("--n_agents", default=3)
-    parser.add_argument("--gpu", default=False)
-    parser.add_argument("--buffer_size", default=30000)
+    parser.add_argument("--n_agents", default=4)
+    parser.add_argument("--gpu", default=True)
+    parser.add_argument("--buffer_size", default=50000)
     parser.add_argument("--h_dim", default=128)
     parser.add_argument("--n_obj", default=2)
     parser.add_argument("--hyper_h1", default=128)
-    parser.add_argument("--n_threads", default=5)
-    parser.add_argument("--batch_size", default=4096)
+    parser.add_argument("--n_threads", default=1)
+    parser.add_argument("--batch_size", default=10000)
     parser.add_argument("--epoches", default=1000)
     parser.add_argument('--preference_distribution', default="uniform")
-    parser.add_argument('--epsilon', default=0.6)
+    parser.add_argument('--epsilon', default=0.2)
     parser.add_argument('--norm_rews', default=True)
-    parser.add_argument('--learning_rate', default=0.001)
-    parser.add_argument('--update_step', default=200)
+    parser.add_argument('--learning_rate', default=1e-7)
+    parser.add_argument('--update_step', default=300)
     parser.add_argument('--batch_size_p', default=1)
     parser.add_argument('--update_times', default=2)
 
@@ -132,11 +140,11 @@ def get_env_args():
     parser.add_argument('--lam', default=100)
     parser.add_argument('--mean_normal', default=100000)
     parser.add_argument('--var_normal', default=10000)
-    parser.add_argument('--num_user', default=3)
-    parser.add_argument('--processing_period', default=0.01)
+    parser.add_argument('--num_user', default=4)
+    parser.add_argument('--processing_period', default=0.1)
     parser.add_argument('--discrete', default=True)
-    parser.add_argument("--n_threads", default=5)
-    parser.add_argument('--log_dir', default='./log2')
+    parser.add_argument("--n_threads", default=1)
+    parser.add_argument('--log_dir', default='./log5')
 
     return parser.parse_args()
 
