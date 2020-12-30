@@ -47,44 +47,47 @@ class Agents():
         rew = sample["rew"]
         state = sample["state"]
         state_ = sample["next_state"]
-        Q_ = []
-        ####################################################################
-        for i in range(self.args.batch_size):
-            Q_.append([])
-            for j in range(self.args.batch_size_p):
-                Q_[i].append(torch.cat([combine(obs_[a][i], batch_w[a])
-                      for a in range(self.args.n_agents)], dim=0).unsqueeze(0))
-            Q_[i] = torch.cat(Q_[i], dim=0)
-        Q_ = torch.cat(Q_, dim=0).permute(1, 0, 2, 3)
-        ####################################################################
-        Q_ = torch.cat([self.policy[a].get_target_q(Q_[a], batch_w[a][0]).unsqueeze(0)
-                        for a in range(self.args.n_agents)], dim=0)
-        Q_ = Q_.squeeze(-1).permute(2, 0, 1).view(-1, self.args.n_agents * 3)
+        # Q_ = []
+        # ####################################################################
+        # for i in range(self.args.batch_size):
+        #     Q_.append([])
+        #     for j in range(self.args.batch_size_p):
+        #         Q_[i].append(torch.cat([combine(obs_[a][i], batch_w[a])
+        #               for a in range(self.args.n_agents)], dim=0).unsqueeze(0))
+        #     Q_[i] = torch.cat(Q_[i], dim=0)
+        # Q_ = torch.cat(Q_, dim=0).permute(1, 0, 2, 3)
+        # ####################################################################
+        # Q_ = torch.cat([self.policy[a].get_target_q(Q_[a], batch_w[a][0]).unsqueeze(0)
+        #                 for a in range(self.args.n_agents)], dim=0)
+        # Q_ = Q_.squeeze(-1).permute(2, 0, 1).view(-1, self.args.n_agents * 3)
         obs = [torch.cat([obs[i] for _ in range(self.args.batch_size_p)]) for i in range(self.args.n_agents)]
         w = copy.deepcopy(batch_w[0])
         batch_w = [batch_w[i].data.cpu().numpy().repeat(self.args.batch_size, axis=0) for i in range(self.args.n_agents)]
         Q = torch.cat([self.policy[i].get_q(obs[i], batch_w[i], act[i]) for i in range(self.args.n_agents)], dim=-1)
         Q_tot = self.hyperNet.get_Q_tot(state, w, Q)
-        Q_tot_target = self.hyperNet_target.get_Q_tot(state_, w, Q_).detach()
+        # Q_tot_target = self.hyperNet_target.get_Q_tot(state_, w, Q_).detach()
         rew = rew.unsqueeze(0).repeat([self.args.batch_size_p, 1, 1]).view(-1, self.args.n_obj)
-        loss = self.loss_func(Q_tot, Q_tot_target,rew, w)
+        loss = self.loss_func(Q_tot, rew, w)
+        if loss.data.numpy() < 1:
+            print()
         self.optim.zero_grad()
         loss.backward()
         self.optim.step()
         self.lr_scheduler.step()
         # print("learning rate:", self.optim)
 
-    def loss_func(self, Q, Q_target, R, w):
+    def loss_func(self, Q, R, w):
+        # print("Q:", Q, '\nR:', R)
         R = self.convert_type(R)
         w = self.convert_type(w)
-        y = R + Q_target
+        y = R
         w = w.repeat([self.args.batch_size, 1]).view(-1, self.args.n_obj)
         La = torch.norm(y - Q, p=2, dim=-1).mean()
         wy = torch.bmm(w.unsqueeze(1), y.unsqueeze(-1))
         wq  =torch.bmm(w.unsqueeze(1), Q.unsqueeze(-1))
-        Lb = torch.abs(wy - wq).mean()
-        # loss = La + Lb
-        loss = La
+        Lb = torch.square(wy - wq).mean()
+        loss = La + Lb
+        # loss = Lb
         return loss
 
     def push(self, traj):

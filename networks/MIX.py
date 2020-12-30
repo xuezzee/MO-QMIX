@@ -52,7 +52,7 @@ class HyperNet(nn.Module):
         # b1 = torch.abs(b1)
         # b2 = torch.abs(b2)
         h1 = F.relu(torch.bmm(Q, w1) + b1)
-        out = F.relu(torch.bmm(h1, w2) + b2)
+        out = torch.bmm(h1, w2) + b2
 
         return out.squeeze(1)
         return torch.bmm(w.unsqueeze(1), out.permute(0, 2, 1)).squeeze(-1)

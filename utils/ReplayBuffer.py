@@ -21,16 +21,16 @@ class ReplayBuffer():
         return self.filled_i
 
     def push(self, obs, act, rew, next_obs, dones, state, next_state, pref):
-        obs = self.convert_type(obs)
+        obs = self.convert_type(obs).transpose((1,0,2))
         act = self.convert_type(act).transpose((1,0,2))
         rew = self.convert_type(rew)
-        next_obs = self.convert_type(next_obs)
+        next_obs = self.convert_type(next_obs).transpose((1,0,2))
         dones = self.convert_type(dones)
         state = self.convert_type(state)
         next_state = self.convert_type(next_state)
         pref = self.convert_type(pref)
 
-        nentries = obs.shape[0]
+        nentries = state.shape[0]
         if self.curr_i + nentries > self.args.buffer_size:
             rollover = self.args.buffer_size - self.curr_i
             for a in range(self.args.n_agents):
@@ -51,9 +51,10 @@ class ReplayBuffer():
         self.rew_buffs[self.curr_i:self.curr_i + nentries] = rew
         # self.pref_buffs[self.curr_i:self.curr_i + nentries] = pref
         for a in range(self.args.n_agents):
-            self.obs_buffs[a][self.curr_i:self.curr_i + nentries] = np.vstack(obs[:, a])
+            # temp = np.vstack(obs[:, a])
+            self.obs_buffs[a][self.curr_i:self.curr_i + nentries] = obs[a]
             self.act_buffs[a][self.curr_i:self.curr_i + nentries] = act[a]
-            self.next_obs_buffs[a][self.curr_i:self.curr_i + nentries] = np.vstack(next_obs[:, a])
+            self.next_obs_buffs[a][self.curr_i:self.curr_i + nentries] = next_obs[a]
 
         self.curr_i += nentries
         if self.filled_i < self.args.buffer_size:

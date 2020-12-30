@@ -50,35 +50,35 @@ def run():
     record_step = 0
     for ep in range(agent_args.epoches // agent_args.n_threads):
         print('episode:{0}--------------------------------------------'.format(ep))
-        obs = env.reset()
+        tot_task = 0
+        obs, info = env.reset()
         state = env.get_state()
         w = preferences.sample(1, require_tensor=False)[0]
         tot_rew = 0
         print("epsilon:", agent_args.epsilon)
-        for step in range(200):
-            if agent_args.epsilon > 0.01:
-                if total_step % 1000 == 0:
+        for step in range(5000):
+            tot_task += sum([i["new_task"] for i in info]) / len(info)
+            if agent_args.epsilon > 0.05:
+                if total_step % 2000 == 0:
                     agent_args.epsilon = agent_args.epsilon * 0.8
             else:
                 agent_args.epsilon = 0.05
-            print("obs:", obs)
+            # print("obs:", obs)
             acts = agents.choose_action(obs, w, agent_args.epsilon)
-            print("acts:", acts)
+            # print("acts:", acts)
             obs_, rew, done, info = env.step(acts)
-            print("obs_next:", obs_)
-            print("rew:", rew)
-            print("--------------------------------------------------")
+            # print("obs_next:", obs_)
+            # print("rew:", rew)
+            # print("--------------------------------------------------")
             for i in range(len(rew)):
                 window['r'].append(rew[i])
                 window['w'].append(np.array(w[i][0]))
-                if len(window['r']) > agent_args.n_threads:
+                if len(window['r']) > agent_args.n_threads * 5:
                     window['r'].pop(0)
                     window['w'].pop(0)
             # if record_step % 1 == 0:
             #     cal_average_score(window, total_step, writer)
             tot_rew += average_reward(window)
-            # print("reward:", rew)
-            # print('preference:', w)
             state_ = env.get_state()
             pref = [w[0][0]]
             traj = {"obs":obs, "rew":rew, "acts":acts, "done":done, "pref":pref,
@@ -86,10 +86,6 @@ def run():
             agents.push(traj)
             state = state_
             obs = obs_
-            # print("agents.replayBuffer.__len__():", agents.replayBuffer.__len__())
-            # print("agent_args.batch_size:", agent_args.batch_size)
-            # print("update_step:", update_step)
-            # print("agent_args.update_step:", agent_args.update_step)
             if ((agents.replayBuffer.__len__() >= agent_args.batch_size) and update_step == agent_args.update_step):
                 for t in range(agent_args.update_times):
                     print('updating... step:{0}'.format(t))
@@ -106,25 +102,26 @@ def run():
             record_step += 1
             time_end = time.time()
         print("ep reward:", tot_rew)
+        print("tot_reward:", tot_task)
         writer.add_scalar("total reward:", tot_rew, ep)
 
 
 def get_args():
     parser = argparse.ArgumentParser()
     parser.add_argument("--n_agents", default=4)
-    parser.add_argument("--gpu", default=True)
+    parser.add_argument("--gpu", default=False)
     parser.add_argument("--buffer_size", default=50000)
     parser.add_argument("--h_dim", default=128)
     parser.add_argument("--n_obj", default=2)
     parser.add_argument("--hyper_h1", default=128)
-    parser.add_argument("--n_threads", default=1)
+    parser.add_argument("--n_threads", default=5)
     parser.add_argument("--batch_size", default=10000)
     parser.add_argument("--epoches", default=1000)
     parser.add_argument('--preference_distribution', default="uniform")
-    parser.add_argument('--epsilon', default=0.2)
-    parser.add_argument('--norm_rews', default=True)
-    parser.add_argument('--learning_rate', default=1e-7)
-    parser.add_argument('--update_step', default=300)
+    parser.add_argument('--epsilon', default=0.8)
+    parser.add_argument('--norm_rews', default=False)
+    parser.add_argument('--learning_rate', default=1e-3)
+    parser.add_argument('--update_step', default=500)
     parser.add_argument('--batch_size_p', default=1)
     parser.add_argument('--update_times', default=2)
 
@@ -143,8 +140,8 @@ def get_env_args():
     parser.add_argument('--num_user', default=4)
     parser.add_argument('--processing_period', default=0.1)
     parser.add_argument('--discrete', default=True)
-    parser.add_argument("--n_threads", default=1)
-    parser.add_argument('--log_dir', default='./log5')
+    parser.add_argument("--n_threads", default=5)
+    parser.add_argument('--log_dir', default='./logs')
 
     return parser.parse_args()
 

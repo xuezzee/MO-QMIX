@@ -10,9 +10,12 @@ NEW_TASK_MEAN = 500000000
 NEW_TASK_VAR = 100000
 # B = 1000000000/NUM_UE# 每个用户的信道带宽
 var_noise = 10**(-5)
-DELTA_T = 0.01
-T_UNIT = 0.01
-
+DELTA_T = 0.1
+T_UNIT = 0.1
+He = abs(1 / np.sqrt(2) * (np.random.randn(1)
+                                + 1j * np.random.randn(1)))  # 边缘
+Hc = 0.1 * abs(1 / np.sqrt(2) * (np.random.randn(1)
+                                      + 1j * np.random.randn(1)))  # 云
 
 class CommEnv():
     def __init__(self, args=None ,eval=False):
@@ -29,6 +32,8 @@ class CommEnv():
             self.ACTIONS = [i * 0.1 for i in range(11)]
         self.eval = eval
         self.B = 1000000000/self.num_user
+        # self.max_cap = 100000 * 100
+        self.max_cap = 1000000000
 
     def init_channel_matrix(self):
         # UE_Channel_matrix = np.zeros((NUM_Channel, self.num_user))
@@ -50,16 +55,19 @@ class CommEnv():
         self.ep_r = np.array([0, 0])
         self.task_remain = np.zeros(self.num_user)
         self.UE_Channel_matrix = self.init_channel_matrix()
-        self.create_new_task(DELTA_T)
+        new_task, _ = self.create_new_task(DELTA_T)
+        new_task = (new_task - self.args.mean_normal) / self.args.var_normal / 1000
         self.He = abs(1 / np.sqrt(2) * (np.random.randn(self.num_user)
                                         + 1j * np.random.randn(self.num_user)))  # 边缘
         self.Hc = 0.1 * abs(1 / np.sqrt(2) * (np.random.randn(self.num_user)
                                               + 1j * np.random.randn(self.num_user)))  # 云
+        # self.He = He
+        # self.Hc = Hc
         task_remain = (self.task_remain - self.args.mean_normal) / self.args.var_normal / 1000
         obs = np.array([list(task_remain[i].reshape(-1)) + [self.He[i]]
                         + [self.Hc[i]] for i in range(self.num_user)])
 
-        return obs
+        return obs, {"new_task": new_task}
 
     def sum_rate(self, UE_Channel_matrix, He, Hc, pe, pc, B, var_noise):
         pe = np.array(pe)
@@ -146,13 +154,24 @@ class CommEnv():
         return reward, E, T
 
     def create_new_task(self, delta_t):
+        tot_new_task = 0
         n = int(delta_t//T_UNIT)
+        punishment = 0
         for u in range(self.num_user):
             for i in range(n):
                 task_num = np.random.poisson(lam=self.args.lam, size=1)[0]
                 for i in range(task_num):
                     new_task = random.normalvariate(self.args.mean_normal, self.args.var_normal)
+                    tot_new_task += new_task
                     self.task_remain[u] += new_task
+            if self.task_remain[u] > self.max_cap:
+                self.task_remain[u] = self.max_cap
+                punishment += -0
+        # if punishment != 0:
+        #     print("punishment:", punishment)
+        # else:
+        #     print("not punished")
+        return tot_new_task, punishment
 
     def step(self, actions, delta_t=None):
         self.n_step += 1
@@ -167,28 +186,33 @@ class CommEnv():
         offloaded_data = np.zeros_like(self.task_remain)
         for i in range(self.num_user):
             offloaded_data[i] = (x[i] * rate_cloud[i].sum() + (1 - x[i]) * rate_edge[i].sum()) * self.args.processing_period
+            # print('offload:', (offloaded_data - self.args.mean_normal) / self.args.var_normal / 1000)
             self.task_remain[i] -= offloaded_data[i]
             if self.task_remain[i] < 0:
-                offloaded_data[i] += self.task_remain[i]
+                # offloaded_data[i] += self.task_remain[i]
                 self.task_remain[i] = 0
-
+        # print("offload_data: {0}".format(offloaded_data))
         obj_e, _, _ = self.compute_reward(self.UE_Channel_matrix, x, Pe, Pc, offloaded_data)
-        reward = np.array([offloaded_data.sum(axis=-1), obj_e.sum(axis=-1)])
+        reward = np.array([(offloaded_data.sum(axis=-1) - self.args.mean_normal) / self.args.var_normal / 1000, obj_e.sum(axis=-1)])
         self.ep_r = self.ep_r + reward
-        self.create_new_task(delta_t)
+        new_task, punishment = self.create_new_task(delta_t)
+        new_task = (new_task - self.args.mean_normal) / self.args.var_normal / 1000
+        # print("new_task: {0}, remain: {1}".format(new_task, (self.task_remain - self.args.mean_normal) / self.args.var_normal / 1000))
+        # print((self.max_cap - self.args.mean_normal) / self.args.var_normal / 1000)
+        reward[0] += punishment
         # print("task remain after new:", self.task_remain)
         # print("----------------------------------------------------------------------------------------")
         self.n_step += 1
-        # self.He = abs(1 / np.sqrt(2) * (np.random.randn(NUM_Channel, self.num_user)
-        #                                 + 1j * np.random.randn(NUM_Channel, self.num_user)))  # 边缘
-        # self.Hc = 0.1 * abs(1 / np.sqrt(2) * (np.random.randn(NUM_Channel, self.num_user)
-        #                                       + 1j * np.random.randn(NUM_Channel, self.num_user)))  # 云  #TODO
-        task_remain = (self.task_remain - self.args.mean_normal) / self.args.var_normal / 1000
+        self.He = abs(1 / np.sqrt(2) * (np.random.randn(self.num_user)
+                                        + 1j * np.random.randn(self.num_user)))  # 边缘
+        self.Hc = 0.1 * abs(1 / np.sqrt(2) * (np.random.randn(self.num_user)
+                                              + 1j * np.random.randn(self.num_user)))  # 云
+        task_remain = (self.task_remain - self.args.mean_normal) / self.args.var_normal / 1000 // 1
         obs = np.array([list(task_remain[i].reshape(-1)) + [self.He[i]]
                         + [self.Hc[i]] for i in range(self.num_user)])
         #TODO to be modified
 
-        return obs, reward, False, {}
+        return obs, reward, False, {"new_task": new_task, "punishment": punishment}
 
     def get_state(self):
         task_remain = (self.task_remain - self.args.mean_normal) / self.args.var_normal / 1000
@@ -219,8 +243,8 @@ def get_args():
     parser.add_argument('--lam', default=100)
     parser.add_argument('--mean_normal', default=100000)
     parser.add_argument('--var_normal', default=10000)
-    parser.add_argument('--num_user', default=3)
-    parser.add_argument('--processing_period', default=0.01)
+    parser.add_argument('--num_user', default=1)
+    parser.add_argument('--processing_period', default=0.1)
     parser.add_argument('--discrete', default=True)
 
     return parser.parse_args()
@@ -230,19 +254,24 @@ if __name__ == '__main__':
     args = get_args()
     env = CommEnv(args)
     env.reset()
+    env.step([[0, 7, 7]])
+    env.step([[1, 7, 7]])
+    env.step([[5, 7, 7]])
+    env.step([[10, 7, 7]])
     for ep in range(10):
+        env.reset()
         tot_rew1 = 0
         tot_rew2 = 0
-        for i in range(200):
-            action = [[np.random.randint(0, 10) for _ in range(3)] for _ in range(args.num_user)]
+        for i in range(1000):
+            action = [[np.random.randint(0, 10) for _ in range(4)] for _ in range(args.num_user)]
             # print(action)
-            action = [[5, 10, 10] for _ in range(args.num_user)]
+            action = [[0, 10, 10] for _ in range(args.num_user)]
             # print(action)
             # print("action:", action)
             # state, reward, done, info = env.step(action, 0.001)
             # print(info)
             o, r, _, _ = env.step(action)
-            print("o:", o)
+            # print("o:", o)
             # print(r)
             tot_rew1 += r[0]
             tot_rew2 += r[1]

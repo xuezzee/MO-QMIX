@@ -47,8 +47,10 @@ class EnvWrapper():
             remote.send(("reset", None))
         # print([self.remotes[i].recv() for i in range(self.args.n_threads)])
         tup = [self.remotes[i].recv() for i in range(self.args.n_threads)]
+        obs = [s[0] for s in tup]
+        info = [i[1] for i in tup]
 
-        return tup
+        return obs, info
 
     def get_state(self):
         for remote in self.remotes:
@@ -66,15 +68,17 @@ class EnvWrapper_sigle():
         self.state_space = self.env.state_space
 
     def reset(self):
-        tup = [self.env.reset()]
-        return tup
+        tup = self.env.reset()
+        obs = [tup[0]]
+        info = tup[1]
+        return obs, info
 
     def step(self, actions):
         tup = self.env.step(actions[0])
         obs = [tup[0]]
         rew = [tup[1]]
         done = [tup[2]]
-        info = [tup[3]]
+        info = tup[3]
         return obs, rew, done, info
 
     def get_state(self):
